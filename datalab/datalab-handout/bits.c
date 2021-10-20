@@ -172,7 +172,8 @@ int tmin(void) {
  *   Rating: 1
  */
 int isTmax(int x) {
-  return 2;
+  int mask = 1 << 31;
+  return !((~x) ^ mask);
 }
 /* 
  * allOddBits - return 1 if all odd-numbered bits in word set to 1
@@ -183,7 +184,9 @@ int isTmax(int x) {
  *   Rating: 2
  */
 int allOddBits(int x) {
-  return 2;
+  int mask = 0xAAAAAAAA;
+  int tmpX = x & mask;
+  return !(tmpX ^ mask);
 }
 /* 
  * negate - return -x 
@@ -193,7 +196,7 @@ int allOddBits(int x) {
  *   Rating: 2
  */
 int negate(int x) {
-  return 2;
+  return (~x)+1;
 }
 //3
 /* 
@@ -206,7 +209,10 @@ int negate(int x) {
  *   Rating: 3
  */
 int isAsciiDigit(int x) {
-  return 2;
+  int sig = (1 << 31);
+  int bigger = !((x + (~0x30 + 1)) & sig);
+  int less = !((0x39 + (~x + 1)) & sig);
+  return bigger & less;
 }
 /* 
  * conditional - same as x ? y : z 
@@ -216,7 +222,10 @@ int isAsciiDigit(int x) {
  *   Rating: 3
  */
 int conditional(int x, int y, int z) {
-  return 2;
+  int flag = !x;		
+  //  x == 1  =>  flag = 0xffffffff
+  flag = flag + (~1+1);
+  return (flag & y) | (~flag & z);
 }
 /* 
  * isLessOrEqual - if x <= y  then return 1, else return 0 
@@ -226,7 +235,19 @@ int conditional(int x, int y, int z) {
  *   Rating: 3
  */
 int isLessOrEqual(int x, int y) {
-  return 2;
+  int signX = x >> 31;
+  int signY = y >> 31;
+  
+  int sameSign = signX ^ signY;
+  
+//  sameSign = 1
+  int diffRet = !!signX;  
+
+// sameSign = 0;
+  int sub = y + (~x + 1);
+  int sign = 1 << 31;
+  int sameRet = !(sub & sign);
+  return (sameSign & diffRet) | ((!sameSign) & sameRet);
 }
 //4
 /* 
@@ -238,7 +259,13 @@ int isLessOrEqual(int x, int y) {
  *   Rating: 4 
  */
 int logicalNeg(int x) {
-  return 2;
+  x = x >> 1 | x;
+  x = x >> 2 | x;
+  x = x >> 4 | x;
+  x = x >> 8 | x;
+  x = x >> 16 | x;
+
+  return (~x)&1;
 }
 /* howManyBits - return the minimum number of bits required to represent x in
  *             two's complement
@@ -253,7 +280,35 @@ int logicalNeg(int x) {
  *  Rating: 4
  */
 int howManyBits(int x) {
-  return 0;
+  int sign = x >> 31;
+  // when compute the mininum bits, we should note that,
+  // if the minimum of 2's complement is added by 1,
+  // then the bit will be overflow,
+  // so when meeting the negetive, just oppose it by bits and don't add 1.
+  int bit16, bit8, bit4, bit2, bit1, bit0;
+  x = (sign & (~x)) | ((~sign) & x);
+
+  // if the top 16-bits has 1, we need at least 16 bits.
+  bit16 = (!!(x>>16)) << 4;
+  x = x >> bit16;
+  
+  // if the top 8-bits has 1, we need at least 8 bits, and so on.
+  bit8 = (!!(x>>8)) << 3;
+  x = x >> bit8;
+
+  bit4 = (!!(x>>4)) << 2;
+  x = x >> bit4;
+
+  bit2 = (!!(x>>2)) << 1;
+  x = x >> bit2;
+
+  bit1 = (!!(x>>1));
+  x = x >> bit1;
+
+  bit0 = !!(x);
+  
+
+  return bit16 + bit8 + bit4 + bit2 + bit1 + bit0 + 1;
 }
 //float
 /* 
