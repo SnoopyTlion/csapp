@@ -172,8 +172,8 @@ int tmin(void) {
  *   Rating: 1
  */
 int isTmax(int x) {
-  int mask = 1 << 31;
-  return !((~x) ^ mask);
+  
+  return !(~((x + !(x+1)) ^ (x+1)));
 }
 /* 
  * allOddBits - return 1 if all odd-numbered bits in word set to 1
@@ -184,9 +184,12 @@ int isTmax(int x) {
  *   Rating: 2
  */
 int allOddBits(int x) {
-  int mask = 0xAAAAAAAA;
-  int tmpX = x & mask;
-  return !(tmpX ^ mask);
+  int mask = 0xAA;
+  int t1 = x & mask;
+  int t2 = (x >> 8) & t1;
+  int t3 = (x >> 16) & t2;
+  int t4 = (x >> 24) & t3;
+  return !(t4 ^ mask);
 }
 /* 
  * negate - return -x 
@@ -323,10 +326,39 @@ int howManyBits(int x) {
  *   Rating: 4
  */
 unsigned floatScale2(unsigned uf) {
-  return 2;
+  unsigned exp;
+  unsigned flagNAN;	// flag to recongnize NAN
+  unsigned flag0;	// flag to recongnize 0 of exponent 
+  unsigned res;
+  unsigned frac;
+  unsigned sign;
+
+  sign = uf & 0x80000000;
+  frac = uf & 0x007fffff;  
+
+  exp = uf & 0x7f800000;
+  exp = exp >> 23;
+ 	
+  flag0 = exp;
+  // exp == 0:  flag0 == 0
+  // exp != 0:  flag0 != 0  => 0xffffffff
+  flag0 = (!flag0) + 0xffffffff;
+
+  exp = exp + 1;
+  exp = exp & 0xff;
+  flagNAN = exp;
+  // uf == NAN:  flagNAN == 0
+  // uf != NAN:  flagNAN != 0 => 0xffffffff
+  flagNAN = (!flagNAN) + 0xffffffff;
+
+  exp = exp << 23;
+  
+  res = (uf & 0x807fffff) | exp;
+
+  return (res & flag0 & flagNAN) | (uf & (~flagNAN)) | ((sign | (frac << 1)) & (~flag0));
 }
 /* 
- * floatFloat2Int - Return bit-level equivalent of expression (int) f
+ * floatFloat2Int - Return bit-level equivalent of expression: (int) f
  *   for floating point argument f.
  *   Argument is passed as unsigned int, but
  *   it is to be interpreted as the bit-level representation of a
@@ -338,7 +370,38 @@ unsigned floatScale2(unsigned uf) {
  *   Rating: 4
  */
 int floatFloat2Int(unsigned uf) {
-  return 2;
+  int res;
+  unsigned sign;
+  int exp;
+  int shift;
+  int frac;  
+
+  frac = uf & 0x007fffff;
+  frac = frac | 0x00800000;
+  sign = uf & 0x80000000;
+  sign = (!sign) + 0xffffffff;
+  
+  exp = uf >> 23;
+  exp = exp & 0xff;
+  exp = exp - 127;
+
+  if (exp > 30) {
+    res = 0x80000000u;
+  }
+  else if (exp < 0) {
+    res = 0;
+  }
+  else {
+    shift = exp - 23;
+    if (shift >= 0) {
+      res = frac << shift;
+    }
+    else {
+      res = frac >> (-shift);
+    }
+  }
+  
+  return ((~sign) & res) | (sign & (-res));
 }
 /* 
  * floatPower2 - Return bit-level equivalent of the expression 2.0^x
@@ -354,5 +417,24 @@ int floatFloat2Int(unsigned uf) {
  *   Rating: 4
  */
 unsigned floatPower2(int x) {
-    return 2;
+  unsigned exp;
+  unsigned res;
+  unsigned shift;
+
+  if (x > 127) {
+    return 0x7f800000;
+  } 
+  else if (x <= 127 && x >= -126) {
+    exp = x + 127;
+    res = exp << 23;
+  }
+  else if (x >= -149){
+    shift = (-127) - x;
+    res = 0x00400000 >> shift;
+  }
+  else {
+    res = 0;
+  }
+ 
+  return res;
 }
